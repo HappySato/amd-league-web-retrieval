@@ -12,8 +12,9 @@ from urllib.parse import parse_qs, unquote, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from iwir.http import polite_get
 from iwir.models import SearchHit, SearchRequest
-from iwir.net import BROWSER_USER_AGENT, DUCKDUCKGO_GATE, allowed_url
+from iwir.net import BROWSER_USER_AGENT, allowed_url
 
 log = logging.getLogger(__name__)
 
@@ -34,9 +35,20 @@ class DuckDuckGoProvider:
             "Accept-Language": "en",
         }
         timeout = _remaining_timeout(self.timeout, request.deadline)
-        DUCKDUCKGO_GATE.wait()
         for url in ("https://html.duckduckgo.com/html/", "https://lite.duckduckgo.com/lite/"):
-            response = self.client.get(url, params={"q": request.query}, headers=headers, timeout=timeout)
+            try:
+                response = polite_get(
+                    self.client,
+                    url,
+                    params={"q": request.query},
+                    headers=headers,
+                    timeout=timeout,
+                    deadline=request.deadline,
+                    retries=1,
+                )
+            except httpx.HTTPError as exc:
+                log.info("DuckDuckGo %s failed: %s", url, exc)
+                continue
             if response.status_code != 200:
                 log.info("DuckDuckGo %s returned HTTP %s", url, response.status_code)
                 continue

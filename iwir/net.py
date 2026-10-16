@@ -15,8 +15,8 @@ import time
 from urllib.parse import urlparse
 
 WIKI_USER_AGENT = (
-    "IWIR-Prototype/0.1 (AMD AI League match 4 educational prototype; "
-    "local retrieval, no account)"
+    "IWIR-Prototype/0.2 (AMD AI League match 4 educational prototype; "
+    "local retrieval; contact: local-operator)"
 )
 BROWSER_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -86,8 +86,13 @@ class RequestGate:
             return time.monotonic() < getattr(self, "_blocked_until", 0.0)
 
 
-DUCKDUCKGO_GATE = RequestGate(0.7)
-WIKIPEDIA_GATE = RequestGate(0.4)
+# Per-host spacing. Wikimedia asks for a descriptive user agent and a modest
+# rate; HTML search endpoints are slower because they ban bursts.
+DUCKDUCKGO_GATE = RequestGate(1.0)
+WIKIPEDIA_GATE = RequestGate(0.8)
+WIKIDATA_GATE = RequestGate(0.5)
+BING_GATE = RequestGate(1.2)
+BRAVE_GATE = RequestGate(1.2)
 
 
 def urls_in_text(text: str) -> list[str]:

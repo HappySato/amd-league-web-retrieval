@@ -60,15 +60,29 @@ def answer_question(
 
     heuristic = choose_answer(question.question, pages) if pages else None
     if not (heuristic and heuristic.confidence >= 0.9):
-        hits = _prefer_reference_hosts(_search(question, config, services, deadline))
+        hits = _prefer_reference_hosts(_search(question, config, services, deadline), question.question)
         heuristic = _read_hits(
             question, hits, pages, seen, config, services, deadline, heuristic, config.max_pages
         )
-        if heuristic is None or heuristic.confidence < 0.8:
+        # Keep asking the next keyless provider while the answer is weak.
+        # A snippet-only value (capped near 0.7) gets one extra source, not the
+        # whole list, so a rate limit does not burn the 24s budget.
+        rounds = 0
+        while (heuristic is None or heuristic.confidence < 0.8) and rounds < 4:
+            if (
+                heuristic is not None
+                and heuristic.confidence >= 0.7
+                and "+snippet" in heuristic.method
+                and rounds >= 1
+            ):
+                break
             more = _search_rest(question, config, services, deadline)
+            if not more:
+                break
+            rounds += 1
             heuristic = _read_hits(
                 question,
-                _prefer_reference_hosts(more),
+                _prefer_reference_hosts(more, question.question),
                 pages,
                 seen,
                 config,
@@ -203,14 +217,21 @@ def _read_hits(
     return heuristic
 
 
-def _prefer_reference_hosts(hits: list[SearchHit]) -> list[SearchHit]:
-    """Read Wikipedia (and other wikis) before random blogs when both matched."""
+def _prefer_reference_hosts(hits: list[SearchHit], question: str = "") -> list[SearchHit]:
+    """Read Wikipedia before blogs, and the work itself before a film adaptation."""
+    folded = question.casefold()
+    wants_work = any(word in folded for word in ("novel", "play", "book"))
 
-    def rank(hit: SearchHit) -> int:
+    def rank(hit: SearchHit) -> tuple[int, int]:
         host = (urlparse(hit.url).hostname or "").lower()
-        if host.endswith("wikipedia.org"):
-            return 0
-        return 1
+        blob = f"{hit.url} {hit.title}".casefold()
+        adaptation = 0
+        if wants_work and any(
+            token in blob for token in ("film", "tv_series", "television", "miniseries", "movie")
+        ):
+            adaptation = 1
+        wiki = 0 if host.endswith("wikipedia.org") else 1
+        return (adaptation, wiki)
 
     return sorted(hits, key=rank)
 

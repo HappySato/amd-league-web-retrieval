@@ -60,6 +60,11 @@ def _csv(value: str) -> list[str]:
     return [part.strip().lower() for part in value.split(",") if part.strip()]
 
 
+# direct proposes a Wikipedia URL with no request. wikidata, the MediaWiki API,
+# DuckDuckGo HTML, and Bing/Brave HTML are all keyless. Paid search APIs are not listed.
+DEFAULT_SEARCH_PROVIDERS = "direct,wikidata,wikipedia,duckduckgo,bing,brave"
+
+
 @dataclass(slots=True)
 class Config:
     input_path: Path | None
@@ -121,7 +126,7 @@ class Config:
         if args.timeout is not None:
             timeout = max(1.0, min(180.0, args.timeout))
 
-        providers = _csv(_env("SEARCH_PROVIDERS", "duckduckgo,wikipedia"))
+        providers = _csv(_env("SEARCH_PROVIDERS", DEFAULT_SEARCH_PROVIDERS))
         if providers == ["none"] or providers == ["off"]:
             providers = []
 

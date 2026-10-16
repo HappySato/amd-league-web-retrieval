@@ -9,6 +9,7 @@ from urllib.parse import quote
 import httpx
 from bs4 import BeautifulSoup
 
+from iwir.http import polite_get
 from iwir.models import SearchHit, SearchRequest
 from iwir.net import WIKI_USER_AGENT, WIKIPEDIA_GATE
 
@@ -32,7 +33,6 @@ class WikipediaProvider:
             log.info("wikipedia search skipped; waiting out a rate limit")
             return []
         try:
-            WIKIPEDIA_GATE.wait()
             return self._search(request)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
@@ -42,7 +42,8 @@ class WikipediaProvider:
             raise
 
     def _search(self, request: SearchRequest) -> list[SearchHit]:
-        response = self.client.get(
+        response = polite_get(
+            self.client,
             _API,
             params={
                 "action": "query",
@@ -54,15 +55,18 @@ class WikipediaProvider:
             },
             headers={"User-Agent": WIKI_USER_AGENT, "Accept": "application/json"},
             timeout=_remaining_timeout(self.timeout, request.deadline),
+            deadline=request.deadline,
         )
         response.raise_for_status()
         return parse_wiki_search(response.json())[: request.limit]
 
 
 _ATTRIBUTE_ENTITY = re.compile(
-    r"^(?:the\s+)?(?:chemical\s+)?"
-    r"(?:capital|currency|population|president|symbol|boiling point)\s+"
-    r"(?:of|for)\s+(?:the\s+)?(.+)$",
+    r"^(?:the\s+)?"
+    r"(?P<attr>chemical symbol|atomic number|boiling point|official language|"
+    r"capital city|capital|currency|population|president|symbol|language|"
+    r"author|painter)\s+"
+    r"(?:of|for)\s+(?:the\s+)?(?P<entity>.+)$",
     re.I,
 )
 
@@ -74,14 +78,21 @@ def wikipedia_search_query(query: str) -> str:
     punishment). The France article's infobox already holds the capital.
     """
     query = query.strip()
-    for label in ("novel", "play", "book"):
+    for label in ("novel", "play", "book", "painting"):
         title = _title_after(query, label)
         if title:
             return title
+    wrote = re.search(
+        r"^(?:wrote|written|authored|painted)\s+(?:the\s+)?(?:novel\s+|play\s+|book\s+|painting\s+)?(.+)$",
+        query,
+        re.I,
+    )
+    if wrote:
+        return wrote.group(1).strip(" .") or query
     match = _ATTRIBUTE_ENTITY.match(query)
     if not match:
         return query
-    entity = re.split(r"\s+in\s+", match.group(1).strip(), maxsplit=1)[0].strip(" .")
+    entity = re.split(r"\s+in\s+", match.group("entity").strip(), maxsplit=1)[0].strip(" .")
     return entity or query
 
 

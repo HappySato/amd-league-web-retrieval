@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from iwir.browse import html_to_page, page_from_json, page_from_wiki_parse
+from iwir.browse import _promote_header_facts, html_to_page, page_from_json, page_from_wiki_parse
 from iwir.net import allowed_url
 from iwir.search.duckduckgo import parse_ddg_html, unwrap_ddg_href
 from iwir.search.wikipedia import parse_wiki_search
@@ -91,6 +91,18 @@ def test_wiki_parse_and_json_flatten() -> None:
     assert flat is not None
     assert "lead_time_days: 12" in flat.text
     assert ("lead_time_days", "12") in flat.pairs
+
+
+def test_element_header_lines_become_pairs() -> None:
+    pairs, text = _promote_header_facts(
+        'Symbol\n"Au": from Latin\nAtomic number\n6. It is nonmetallic.\n'
+        "chemical symbol\nis\nAu\nBoiling point\n99.98 °C (211.96 °F)"
+    )
+    assert ("Symbol", "Au") in pairs
+    assert ("Atomic number", "6") in pairs
+    assert ("Boiling point", "99.98") in pairs
+    assert "Symbol: Au" in text
+    assert "Atomic number: 6" in text
 
 
 def test_blocks_metadata_and_loopback() -> None:

@@ -13,8 +13,12 @@ from iwir.config import Config, ConfigError
 from iwir.llm import LLMClient
 from iwir.models import SearchHit, SearchRequest
 from iwir.net import BROWSER_USER_AGENT
+from iwir.search.bing import BingProvider
+from iwir.search.brave import BraveProvider
+from iwir.search.direct import DirectReferenceProvider
 from iwir.search.duckduckgo import DuckDuckGoProvider
 from iwir.search.fixture import FixtureProvider
+from iwir.search.wikidata import WikidataProvider
 from iwir.search.wikipedia import WikipediaProvider
 
 log = logging.getLogger(__name__)
@@ -50,12 +54,23 @@ def build_services(config: Config) -> Services:
     )
     providers = []
     for name in config.search_providers:
-        if name == "duckduckgo":
+        if name == "direct":
+            providers.append(DirectReferenceProvider())
+        elif name == "wikidata":
+            providers.append(WikidataProvider(config.search_timeout, client))
+        elif name == "duckduckgo":
             providers.append(DuckDuckGoProvider(config.search_timeout, client))
         elif name == "wikipedia":
             providers.append(WikipediaProvider(config.search_timeout, client))
+        elif name == "bing":
+            providers.append(BingProvider(config.search_timeout, client))
+        elif name == "brave":
+            providers.append(BraveProvider(config.search_timeout, client))
         else:
-            log.warning("unknown search provider %r (known: duckduckgo, wikipedia, fixture)", name)
+            log.warning(
+                "unknown search provider %r (known: direct, wikidata, wikipedia, duckduckgo, bing, brave, fixture)",
+                name,
+            )
 
     cursor: dict[str, list] = {"rest": []}
 

@@ -100,13 +100,18 @@ def tokens(value: str) -> list[str]:
 
 
 _CANON = {
-    "wrote": "write",
-    "written": "write",
-    "writing": "write",
+    "wrote": "author",
+    "written": "author",
+    "writing": "author",
+    "write": "author",
     "authored": "author",
     "author": "author",
     "released": "release",
     "release": "release",
+    "appeared": "release",
+    "appear": "release",
+    "introduced": "release",
+    "introduction": "release",
     "published": "publish",
     "publication": "publish",
     "planets": "planet",
@@ -119,6 +124,12 @@ _CANON = {
     "meters": "meter",
     "metre": "meter",
     "meter": "meter",
+    "languages": "language",
+    "language": "language",
+    "cities": "city",
+    "city": "city",
+    "currencies": "currency",
+    "currency": "currency",
 }
 
 
@@ -161,7 +172,7 @@ def intent_of(question: str) -> str:
         return "date"
     if re.search(
         r"\b(who|whom|author|written by|invented by|capital|currency|symbol|"
-        r"name of|largest|smallest)\b",
+        r"name of|largest|smallest|highest|language|painted)\b",
         q,
     ):
         return "name"

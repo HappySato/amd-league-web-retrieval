@@ -85,6 +85,29 @@ def test_direct_answers(question: str, text: str, pairs: list[tuple[str, str]], 
     assert supported(expected, text)
 
 
+def test_first_appeared_beats_a_later_release() -> None:
+    text = (
+        "First appeared: 20 February 1991\n"
+        "Python 3.0, released in 2008, was a major revision."
+    )
+    chosen = choose_answer(
+        "In what year was the Python programming language first released?",
+        [page("https://example.test/python", text, [("First appeared", "20 February 1991")])],
+    )
+    assert chosen is not None
+    assert chosen.answer == "1991"
+
+
+def test_compound_infobox_label_still_matches() -> None:
+    text = "Capital and largest city: Paris\nFrance is a country. Its capital is Paris."
+    chosen = choose_answer(
+        PARIS,
+        [page("https://example.test/france", text, [("Capital and largest city", "Paris")])],
+    )
+    assert chosen is not None
+    assert chosen.answer == "Paris"
+
+
 def test_number_questions_do_not_return_a_name() -> None:
     text = "Planets: Mercury, Venus, Earth\nThe Solar System has eight planets."
     chosen = choose_answer(
@@ -123,6 +146,53 @@ def test_search_query_keeps_of() -> None:
     assert wikipedia_search_query("boiling point of water in degrees Celsius") == "water"
     assert wikipedia_search_query("speed of light in vacuum") == "speed of light in vacuum"
     assert wikipedia_search_query("wrote the novel Nineteen Eighty-Four") == "Nineteen Eighty-Four"
+    assert wikipedia_search_query("atomic number of carbon") == "carbon"
+    assert wikipedia_search_query("official language of Brazil") == "Brazil"
+    assert wikipedia_search_query("painted the Mona Lisa") == "Mona Lisa"
+    assert wikipedia_search_query("wrote the play Hamlet") == "Hamlet"
+
+
+def test_author_infobox_and_film_credit() -> None:
+    novel = page(
+        "https://en.wikipedia.org/wiki/Nineteen_Eighty-Four",
+        "Author: George Orwell\nNineteen Eighty-Four is a dystopian novel.",
+        [("Author", "George Orwell")],
+    )
+    chosen = choose_answer("Who wrote the novel Nineteen Eighty-Four?", [novel])
+    assert chosen is not None
+    assert chosen.answer == "George Orwell"
+    film = page(
+        "https://en.wikipedia.org/wiki/Nineteen_Eighty-Four_(1984_film)",
+        "Written by: Michael Radford",
+        [("Written by", "Michael Radford")],
+    )
+    assert choose_answer("Who wrote the novel Nineteen Eighty-Four?", [film]) is None
+
+
+def test_comma_grouped_speed_beats_a_small_measurement() -> None:
+    text = (
+        "The refractive index of air is 1.0003. "
+        "The value 299,792,458 metres per second is approximately one billion kilometres per hour."
+    )
+    chosen = choose_answer(
+        "What is the speed of light in vacuum in metres per second?",
+        [page("https://example.test/c", text)],
+    )
+    assert chosen is not None
+    assert chosen.answer == "299792458"
+
+
+def test_novel_question_ignores_the_screenwriter() -> None:
+    film = "https://en.wikipedia.org/wiki/Nineteen_Eighty-Four_(1984_film)"
+    text = (
+        "Nineteen Eighty-Four is a film written by Michael Radford. "
+        "Nineteen Eighty-Four is based on the novel by George Orwell."
+    )
+    chosen = choose_answer("Who wrote the novel Nineteen Eighty-Four?", [page(film, text)])
+    assert chosen is not None
+    assert chosen.answer == "George Orwell"
+    only_credit = "Nineteen Eighty-Four is a film written by Michael Radford."
+    assert choose_answer("Who wrote the novel Nineteen Eighty-Four?", [page(film, only_credit)]) is None
 
 
 def test_measurement_prefers_the_long_number() -> None:
@@ -147,6 +217,33 @@ def test_abstain_when_page_does_not_contain_the_value() -> None:
 def test_does_not_echo_the_question_entity() -> None:
     text = "France is a country in Western Europe."
     assert choose_answer(PARIS, [page("https://example.test/france", text)]) is None
+
+
+def test_painted_highest_and_language() -> None:
+    painted = choose_answer(
+        "Who painted the Mona Lisa?",
+        [page("https://example.test/mona", "The Mona Lisa was painted by Leonardo da Vinci.")],
+    )
+    assert painted is not None
+    assert painted.answer == "Leonardo da Vinci"
+    highest = choose_answer(
+        "What is the highest mountain on Earth?",
+        [page("https://example.test/everest", "Mount Everest is Earth's highest mountain above sea level.")],
+    )
+    assert highest is not None
+    assert highest.answer == "Mount Everest"
+    language = choose_answer(
+        "What is the official language of Brazil?",
+        [
+            page(
+                "https://example.test/br",
+                "Official language: Portuguese\nThe official language of Brazil is Portuguese.",
+                [("Official language", "Portuguese")],
+            )
+        ],
+    )
+    assert language is not None
+    assert language.answer == "Portuguese"
 
 
 def test_number_word_is_supported_as_a_digit() -> None:

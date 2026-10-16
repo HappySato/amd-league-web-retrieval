@@ -14,7 +14,6 @@ from iwir.models import Candidate, Page
 from iwir.textutil import (
     NUMBER_WORDS,
     canon_terms,
-    content_terms,
     echoes_question,
     head_term,
     intent_of,
@@ -71,7 +70,17 @@ def _from_page(question: str, page: Page, intent: str) -> list[Candidate]:
                     continue
                 if not supported(answer, page.text):
                     continue
+                if _skip_adaptation_credit(question, page.url, sentence):
+                    continue
                 confidence = min(0.93, base + 0.015 * overlap)
+                # "first released" should not lose to a later "released in 2008".
+                if (
+                    intent == "date"
+                    and "first" in question.casefold()
+                    and re.fullmatch(r"[12][0-9]{3}", answer)
+                    and "first" not in sentence[max(0, match.start() - 24) : match.end()].casefold()
+                ):
+                    confidence -= 0.12
                 if confidence < 0.7:
                     continue
                 # Prefer the count that sits next to the thing being counted
@@ -80,12 +89,17 @@ def _from_page(question: str, page: Page, intent: str) -> list[Candidate]:
                     head = head_term(sentence[match.end() : match.end() + 40])
                     if head and head in terms:
                         confidence = min(0.93, confidence + 0.08)
-                    # "How many" wants a small integer. A measurement does not;
-                    # a stray 1 on the page should lose to 299792458.
-                    if intent == "number" and "how many" not in question.casefold():
-                        integer = re.sub(r"\D", "", answer.split(".", 1)[0])
-                        if len(integer) < 3:
-                            confidence -= 0.25
+                # "How many" wants a small integer. A measurement does not;
+                # 1.0003 must not beat 299792458, and must not stand alone.
+                if (
+                    intent == "number"
+                    and "how many" not in question.casefold()
+                    and re.fullmatch(r"\d+(?:\.\d+)?", answer)
+                    and len(answer.split(".", 1)[0]) < 3
+                ):
+                    confidence -= 0.25
+                if confidence < 0.7:
+                    continue
                 found.append(
                     Candidate(
                         answer=answer,
@@ -98,18 +112,45 @@ def _from_page(question: str, page: Page, intent: str) -> list[Candidate]:
     return found
 
 
+# Words that ride along on an infobox label ("Capital and largest city")
+# without changing which fact the row is about.
+_LABEL_MODIFIERS = {
+    "largest",
+    "biggest",
+    "smallest",
+    "major",
+    "main",
+    "official",
+    "national",
+    "current",
+    "primary",
+    "administrative",
+    "federal",
+    "city",
+    "town",
+    "state",
+}
+
+
 def _from_pairs(question: str, page: Page, intent: str) -> list[Candidate]:
-    q_terms = set(content_terms(question))
+    q_terms = canon_terms(question)
     found: list[Candidate] = []
     for label, value in page.pairs:
-        label_terms = set(content_terms(label)) or set(re.findall(r"[a-z0-9]+", label.casefold()))
+        label_terms = canon_terms(label)
         if not label_terms or not (label_terms & q_terms):
             continue
-        coverage = len(label_terms & q_terms) / len(label_terms)
-        if coverage < 0.5 and not label_terms <= q_terms:
+        # "Capital and largest city" still answers "capital". A label that
+        # adds some other fact ("area code") does not.
+        if label_terms - q_terms - _LABEL_MODIFIERS:
             continue
+        focused = label_terms - _LABEL_MODIFIERS
+        if not focused or not (focused & q_terms):
+            continue
+        coverage = len(focused & q_terms) / len(focused)
         answer = _finalize(value, question, intent)
         if not answer or not supported(answer, page.text):
+            continue
+        if _skip_adaptation_credit(question, page.url, f"{label}: {value}"):
             continue
         found.append(
             Candidate(
@@ -156,20 +197,48 @@ def _patterns(question: str, intent: str) -> list[tuple[str, re.Pattern[str], fl
             _HIGH,
         )
         add("pattern", r"\bin\s+([12][0-9]{3})\b", _MED)
+        add(
+            "pattern",
+            r"(?:fell|collapsed|landed|opened)\s+(?:on\s+)?(?:\d{1,2}\s+[A-Za-z]+\s+)?([12][0-9]{3})",
+            _HIGH,
+        )
     if "boiling" in q:
-        add("pattern", r"boiling point[^\d]{0,60}?(\d+(?:\.\d+)?)", _HIGH)
+        add("pattern", r"boiling point[^\d-]{0,60}?(-?\d+(?:\.\d+)?)", _HIGH)
         add("pattern", r"boils?\s+at\s+(?:about\s+|approximately\s+|around\s+)?(\d+(?:\.\d+)?)", _HIGH)
     if "largest" in q:
-        add("pattern", r"((?-i:[A-Z][A-Za-z]+))\s+is\s+the\s+largest", _HIGH)
+        add(
+            "pattern",
+            r"((?-i:[A-Z][A-Za-z]+(?:\s+(?-i:[A-Z][A-Za-z]+)){0,3}))\s+is\s+(?:the\s+|earth'?s\s+)?largest",
+            _HIGH,
+        )
         add("pattern", r"largest\s+[a-z]+(?:\s+[a-z]+){0,4}\s+is\s+([^.,;\n]+)", _HIGH)
+    if "highest" in q:
+        add(
+            "pattern",
+            r"((?-i:[A-Z][A-Za-z]+(?:\s+(?-i:[A-Z][A-Za-z]+)){0,3}))\s+is\s+(?:the\s+|earth'?s\s+)?highest",
+            _HIGH,
+        )
+        add("pattern", r"highest\s+[a-z]+(?:\s+[a-z]+){0,4}\s+is\s+([^.,;\n]+)", _HIGH)
     if "smallest" in q:
         add("pattern", r"((?-i:[A-Z][A-Za-z]+))\s+is\s+the\s+smallest", _HIGH)
+    if "language" in q:
+        add(
+            "pattern",
+            r"official language(?:s)?(?:\s+of\s+[a-z][a-z\s]{0,40})?\s+(?:is|are)\s+(?:the\s+)?([^.,;\n]+)",
+            _HIGH,
+        )
+    if "painted" in q or "painter" in q:
+        add("pattern", r"painted\s+by\s+([^.,;\n]+)", _HIGH)
     if intent == "number":
         add(
             "pattern",
             r"(?:is|are|was|were|equals|exactly|has|have)\s+(?:about\s+|approximately\s+|exactly\s+)?(\d[\d,]*(?:\.\d+)?)",
             _HIGH,
         )
+        # "The value 299,792,458 metres per second is ..." puts the figure
+        # before the verb. A comma-grouped or long integer is the measurement.
+        if "how many" not in q:
+            add("pattern", r"\b(\d{1,3}(?:,\d{3})+|\d{6,})\b", _HIGH)
         words = "|".join(NUMBER_WORDS)
         add(
             "pattern",
@@ -184,6 +253,16 @@ def _patterns(question: str, intent: str) -> list[tuple[str, re.Pattern[str], fl
         _LOW,
     )
     return compiled
+
+
+def _skip_adaptation_credit(question: str, url: str, sentence: str) -> bool:
+    """A film or series page's "written by" line is the screenwriter, not the novelist."""
+    if not any(word in question.casefold() for word in ("novel", "play", "book")):
+        return False
+    blob = url.casefold()
+    if not any(token in blob for token in ("_film", "(film)", "tv_series", "television", "miniseries")):
+        return False
+    return bool(re.search(r"\b(written|directed|screenplay|teleplay|adapted)\b", sentence, re.I))
 
 
 def _looks_like_name(answer: str) -> bool:
@@ -211,6 +290,8 @@ def _finalize(raw: str, question: str, intent: str) -> str:
         return ""
     if intent == "number" and answer.casefold() in NUMBER_WORDS:
         answer = NUMBER_WORDS[answer.casefold()]
+    if intent == "number":
+        answer = answer.replace(",", "")
     if intent == "date":
         year = re.search(r"\b([12][0-9]{3})\b", answer)
         if year:

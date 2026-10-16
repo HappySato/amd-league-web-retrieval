@@ -16,6 +16,7 @@ from urllib.parse import unquote, urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from iwir.http import gate_for, polite_get
 from iwir.models import Link, Page
 from iwir.net import BROWSER_USER_AGENT, WIKI_USER_AGENT, WIKIPEDIA_GATE, allowed_url
 
@@ -39,7 +40,6 @@ def fetch_page(
     if title:
         if WIKIPEDIA_GATE.blocked():
             return None
-        WIKIPEDIA_GATE.wait()
         page = fetch_wikipedia_lead(title, deadline, client, timeout=timeout)
         if page is not None and page.text.strip():
             return page
@@ -55,7 +55,8 @@ def fetch_wikipedia_lead(
     timeout: float,
 ) -> Page | None:
     try:
-        response = client.get(
+        response = polite_get(
+            client,
             "https://en.wikipedia.org/w/api.php",
             params={
                 "action": "parse",
@@ -68,6 +69,7 @@ def fetch_wikipedia_lead(
             },
             headers={"User-Agent": WIKI_USER_AGENT, "Accept": "application/json"},
             timeout=_timeout(timeout, deadline),
+            deadline=deadline,
         )
         response.raise_for_status()
         page = page_from_wiki_parse(response.json())
@@ -83,10 +85,12 @@ def fetch_wikipedia_lead(
     slug = title.replace(" ", "_")
     summary_url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + slug
     try:
-        response = client.get(
+        response = polite_get(
+            client,
             summary_url,
             headers={"User-Agent": WIKI_USER_AGENT, "Accept": "application/json"},
             timeout=_timeout(timeout, deadline),
+            deadline=deadline,
         )
         response.raise_for_status()
         return page_from_wiki_summary(response.json())
@@ -133,22 +137,48 @@ def fetch_direct(
     *,
     timeout: float,
 ) -> Page | None:
-    try:
-        with client.stream(
-            "GET",
-            url,
-            headers={"User-Agent": BROWSER_USER_AGENT, "Accept": "text/html,application/json;q=0.9,*/*;q=0.5"},
-            timeout=_timeout(timeout, deadline),
-        ) as response:
-            response.raise_for_status()
-            final_url = str(response.url)
-            if not allowed_url(final_url):
-                log.warning("refusing redirected target %s", final_url)
-                return None
-            content_type = response.headers.get("content-type", "")
-            raw = _read_capped(response, deadline)
-    except httpx.HTTPError as exc:
-        log.warning("fetch failed for %s: %s", url, exc)
+    gate = gate_for(url)
+    if gate.blocked():
+        return None
+    last_error: Exception | None = None
+    for attempt in range(2):
+        if time.monotonic() >= deadline:
+            return None
+        gate.wait()
+        try:
+            with client.stream(
+                "GET",
+                url,
+                headers={
+                    "User-Agent": BROWSER_USER_AGENT,
+                    "Accept": "text/html,application/json;q=0.9,*/*;q=0.5",
+                },
+                timeout=_timeout(timeout, deadline),
+            ) as response:
+                if response.status_code == 429:
+                    gate.penalize(8)
+                    log.warning("fetch rate limited for %s", url)
+                    return None
+                if response.status_code in {502, 503, 504} and attempt == 0:
+                    time.sleep(min(0.4, max(0.0, deadline - time.monotonic() - 0.3)))
+                    continue
+                response.raise_for_status()
+                final_url = str(response.url)
+                if not allowed_url(final_url):
+                    log.warning("refusing redirected target %s", final_url)
+                    return None
+                content_type = response.headers.get("content-type", "")
+                raw = _read_capped(response, deadline)
+                break
+        except httpx.HTTPError as exc:
+            last_error = exc
+            if attempt == 0 and time.monotonic() < deadline - 0.5:
+                time.sleep(0.2)
+                continue
+            log.warning("fetch failed for %s: %s", url, exc)
+            return None
+    else:
+        log.warning("fetch failed for %s: %s", url, last_error)
         return None
     if not raw:
         return None
@@ -183,6 +213,9 @@ def html_to_page(url: str, html: str, title: str = "") -> Page:
     body = soup.get_text("\n", strip=True)
     pair_lines = [f"{label}: {value}" for label, value in pairs]
     text = _collapse("\n".join(pair_lines + [body]))
+    header_pairs, text = _promote_header_facts(text)
+    if header_pairs:
+        pairs = header_pairs + pairs
     return Page(url=url, title=title, text=text[:20_000], pairs=pairs, links=links)
 
 
@@ -238,6 +271,65 @@ def wikipedia_title(url: str) -> str | None:
             return None
         return slug.replace("_", " ")
     return None
+
+
+def _promote_header_facts(text: str) -> tuple[list[tuple[str, str]], str]:
+    """Glue infobox labels that Wikipedia splits onto their own line.
+
+    Element pages emit ``Symbol`` and then ``"Au": from Latin``, not a table
+    row. Water emits ``Boiling point`` and then ``99.98 °C``. The matcher only
+    sees label/value pairs and single sentences, so those lines are joined.
+    """
+    lines = text.splitlines()
+    pairs: list[tuple[str, str]] = []
+    merged: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index].strip()
+        folded = line.casefold().rstrip(":")
+        if folded in {"symbol", "chemical symbol"}:
+            value, consumed = _symbol_after(lines, index)
+            if value:
+                pairs.append(("Symbol", value))
+                merged.append(f"Symbol: {value}")
+                index += consumed
+                continue
+        if folded in {"atomic number", "boiling point", "melting point"}:
+            value, consumed = _number_after(lines, index)
+            if value:
+                label = folded[0].upper() + folded[1:]
+                pairs.append((label, value))
+                merged.append(f"{label}: {value}")
+                index += consumed
+                continue
+        merged.append(lines[index])
+        index += 1
+    return pairs, "\n".join(merged)
+
+
+def _symbol_after(lines: list[str], index: int) -> tuple[str, int]:
+    """Return ``(symbol, lines_consumed)`` looking at most two lines ahead."""
+    for step in (1, 2):
+        if index + step >= len(lines):
+            break
+        candidate = lines[index + step].strip()
+        if candidate.casefold() in {"is", "was", ":", "—", "-"}:
+            continue
+        match = re.match(r"""["']?([A-Z][a-z]?)\b""", candidate)
+        if match:
+            return match.group(1), step + 1
+        break
+    return "", 0
+
+
+def _number_after(lines: list[str], index: int) -> tuple[str, int]:
+    if index + 1 >= len(lines):
+        return "", 0
+    candidate = lines[index + 1].replace("\xa0", " ").strip()
+    match = re.match(r"(-?\d+(?:\.\d+)?)", candidate)
+    if not match:
+        return "", 0
+    return match.group(1), 2
 
 
 def _infobox_pairs(soup: BeautifulSoup) -> list[tuple[str, str]]:

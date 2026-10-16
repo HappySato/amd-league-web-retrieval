@@ -1,0 +1,152 @@
+[
+  {
+    "id": "capital-france",
+    "question": "What is the capital of France?",
+    "answers": ["Paris"],
+    "match": "exact"
+  },
+  {
+    "id": "symbol-gold",
+    "question": "What is the chemical symbol for gold?",
+    "answers": ["Au"],
+    "match": "exact"
+  },
+  {
+    "id": "author-1984",
+    "question": "Who wrote the novel Nineteen Eighty-Four?",
+    "answers": ["George Orwell"],
+    "match": "contains"
+  },
+  {
+    "id": "light-speed",
+    "question": "What is the speed of light in vacuum in metres per second?",
+    "answers": ["299792458"],
+    "match": "exact"
+  },
+  {
+    "id": "planets",
+    "question": "How many planets are in the Solar System?",
+    "answers": ["8", "eight"],
+    "match": "exact"
+  },
+  {
+    "id": "python-year",
+    "question": "In what year was the Python programming language first released?",
+    "answers": ["1991"],
+    "match": "exact"
+  },
+  {
+    "id": "japan-currency",
+    "question": "What is the currency of Japan?",
+    "answers": ["Japanese yen", "yen"],
+    "match": "contains"
+  },
+  {
+    "id": "water-boil",
+    "question": "What is the boiling point of water in degrees Celsius at standard atmospheric pressure?",
+    "answers": ["100", "99.98", "99.9839"],
+    "match": "contains"
+  },
+  {
+    "id": "largest-planet",
+    "question": "What is the largest planet in the Solar System?",
+    "answers": ["Jupiter"],
+    "match": "exact"
+  },
+  {
+    "id": "primary-colors",
+    "question": "What are the three primary colors of light?",
+    "answers": ["red, green, blue", "red, green, and blue"],
+    "match": "contains"
+  },
+  {
+    "id": "capital-japan",
+    "question": "What is the capital of Japan?",
+    "answers": ["Tokyo"],
+    "match": "exact"
+  },
+  {
+    "id": "capital-australia",
+    "question": "What is the capital of Australia?",
+    "answers": ["Canberra"],
+    "match": "exact"
+  },
+  {
+    "id": "capital-canada",
+    "question": "What is the capital of Canada?",
+    "answers": ["Ottawa"],
+    "match": "exact"
+  },
+  {
+    "id": "atomic-carbon",
+    "question": "What is the atomic number of carbon?",
+    "answers": ["6", "six"],
+    "match": "exact"
+  },
+  {
+    "id": "author-hamlet",
+    "question": "Who wrote the play Hamlet?",
+    "answers": ["William Shakespeare", "Shakespeare"],
+    "match": "contains"
+  },
+  {
+    "id": "author-pride",
+    "question": "Who wrote the novel Pride and Prejudice?",
+    "answers": ["Jane Austen"],
+    "match": "contains"
+  },
+  {
+    "id": "mona-lisa",
+    "question": "Who painted the Mona Lisa?",
+    "answers": ["Leonardo da Vinci", "Leonardo"],
+    "match": "contains"
+  },
+  {
+    "id": "moon-landing",
+    "question": "In what year did humans first land on the Moon?",
+    "answers": ["1969"],
+    "match": "exact"
+  },
+  {
+    "id": "berlin-wall",
+    "question": "In what year did the Berlin Wall fall?",
+    "answers": ["1989"],
+    "match": "exact"
+  },
+  {
+    "id": "largest-ocean",
+    "question": "What is the largest ocean on Earth?",
+    "answers": ["Pacific Ocean", "Pacific"],
+    "match": "contains"
+  },
+  {
+    "id": "highest-mountain",
+    "question": "What is the highest mountain on Earth?",
+    "answers": ["Mount Everest", "Everest"],
+    "match": "contains"
+  },
+  {
+    "id": "language-brazil",
+    "question": "What is the official language of Brazil?",
+    "answers": ["Portuguese"],
+    "match": "contains"
+  },
+  {
+    "id": "uk-currency",
+    "question": "What is the currency of the United Kingdom?",
+    "answers": ["pound sterling", "British pound", "pound"],
+    "match": "contains"
+  },
+  {
+    "id": "unanswerable-part",
+    "question": "What is the lead time in days for part ZX-9000-NO-SUCH on the supplier portal?",
+    "answers": [""],
+    "match": "exact"
+  },
+  {
+    "id": "unanswerable-budget",
+    "question": "What is the unpublished internal budget code for project QX-NULL-2026?",
+    "answers": [""],
+    "match": "exact"
+  }
+]

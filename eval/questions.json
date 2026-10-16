@@ -1,0 +1,68 @@
+[
+  {
+    "id": "capital-france",
+    "question": "What is the capital of France?",
+    "answers": ["Paris"],
+    "match": "exact"
+  },
+  {
+    "id": "symbol-gold",
+    "question": "What is the chemical symbol for gold?",
+    "answers": ["Au"],
+    "match": "exact"
+  },
+  {
+    "id": "author-1984",
+    "question": "Who wrote the novel Nineteen Eighty-Four?",
+    "answers": ["George Orwell"],
+    "match": "exact"
+  },
+  {
+    "id": "light-speed",
+    "question": "What is the speed of light in vacuum in metres per second?",
+    "answers": ["299792458"],
+    "match": "exact"
+  },
+  {
+    "id": "planets",
+    "question": "How many planets are in the Solar System?",
+    "answers": ["8", "eight"],
+    "match": "exact"
+  },
+  {
+    "id": "python-year",
+    "question": "In what year was the Python programming language first released?",
+    "answers": ["1991"],
+    "match": "exact"
+  },
+  {
+    "id": "japan-currency",
+    "question": "What is the currency of Japan?",
+    "answers": ["Japanese yen", "yen", "JPY"],
+    "match": "contains"
+  },
+  {
+    "id": "water-boil",
+    "question": "What is the boiling point of water in degrees Celsius at standard atmospheric pressure?",
+    "answers": ["100", "100 °C", "100°C"],
+    "match": "contains"
+  },
+  {
+    "id": "largest-planet",
+    "question": "What is the largest planet in the Solar System?",
+    "answers": ["Jupiter"],
+    "match": "exact"
+  },
+  {
+    "id": "primary-colors",
+    "question": "What are the three primary colors of light?",
+    "answers": ["red, green, blue", "red, green, and blue"],
+    "match": "contains"
+  },
+  {
+    "id": "unanswerable-part",
+    "question": "What is the lead time in days for part ZX-9000-NO-SUCH on the supplier portal?",
+    "answers": [""],
+    "match": "exact"
+  }
+]

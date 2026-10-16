@@ -1,0 +1,127 @@
+{
+  "search": {
+    "capital-france": [
+      {
+        "url": "https://example.test/france",
+        "title": "France",
+        "snippet": "Its capital is Paris."
+      }
+    ],
+    "symbol-gold": [
+      {
+        "url": "https://example.test/gold",
+        "title": "Gold",
+        "snippet": "Gold is a chemical element with the symbol Au."
+      }
+    ],
+    "author-1984": [
+      {
+        "url": "https://example.test/1984",
+        "title": "Nineteen Eighty-Four",
+        "snippet": "A novel written by George Orwell."
+      }
+    ],
+    "light-speed": [
+      {
+        "url": "https://example.test/light",
+        "title": "Speed of light",
+        "snippet": "The speed of light in vacuum is exactly 299792458 metres per second."
+      }
+    ],
+    "planets": [
+      {
+        "url": "https://example.test/planets",
+        "title": "Solar System",
+        "snippet": "The Solar System has eight planets."
+      }
+    ],
+    "python-year": [
+      {
+        "url": "https://example.test/python",
+        "title": "Python (programming language)",
+        "snippet": "First released in 1991."
+      }
+    ],
+    "japan-currency": [
+      {
+        "url": "https://example.test/japan",
+        "title": "Japan",
+        "snippet": "The currency of Japan is the Japanese yen."
+      }
+    ],
+    "water-boil": [
+      {
+        "url": "https://example.test/water",
+        "title": "Boiling point of water",
+        "snippet": "The boiling point of water is 100 degrees Celsius."
+      }
+    ],
+    "largest-planet": [
+      {
+        "url": "https://example.test/jupiter",
+        "title": "Jupiter",
+        "snippet": "Jupiter is the largest planet in the Solar System."
+      }
+    ],
+    "primary-colors": [
+      {
+        "url": "https://example.test/colors",
+        "title": "Primary colors",
+        "snippet": "The three primary colors of light are red, green, and blue."
+      }
+    ],
+    "unanswerable-part": [
+      {
+        "url": "https://example.test/portal",
+        "title": "Supplier portal",
+        "snippet": "Sign in to continue."
+      }
+    ]
+  },
+  "pages": {
+    "https://example.test/france": {
+      "title": "France",
+      "html": "<html><body><table class=\"infobox\"><tr><th>Capital</th><td>Paris<br>48°51′N 2°21′E</td></tr><tr><th>Official language</th><td>French</td></tr></table><p>France is a country in Western Europe. Its capital is Paris and its largest city is Paris.</p></body></html>"
+    },
+    "https://example.test/gold": {
+      "title": "Gold",
+      "html": "<html><body><p>Gold is a chemical element with the symbol Au and atomic number 79.</p></body></html>"
+    },
+    "https://example.test/1984": {
+      "title": "Nineteen Eighty-Four",
+      "html": "<html><body><p>Nineteen Eighty-Four is a dystopian novel written by George Orwell.</p></body></html>"
+    },
+    "https://example.test/light": {
+      "title": "Speed of light",
+      "html": "<html><body><p>The speed of light in vacuum is exactly 299792458 metres per second.</p></body></html>"
+    },
+    "https://example.test/planets": {
+      "title": "Solar System",
+      "html": "<html><body><p>There is one star in the Solar System. The Solar System has eight planets.</p></body></html>"
+    },
+    "https://example.test/python": {
+      "title": "Python (programming language)",
+      "html": "<html><body><p>The Python programming language was first released in 1991 by Guido van Rossum.</p></body></html>"
+    },
+    "https://example.test/japan": {
+      "title": "Japan",
+      "html": "<html><body><table class=\"infobox\"><tr><th>Currency</th><td>Japanese yen (¥)</td></tr></table><p>Japan is an island country in East Asia. The currency of Japan is the Japanese yen.</p></body></html>"
+    },
+    "https://example.test/water": {
+      "title": "Properties of water",
+      "html": "<html><body><p>The boiling point of water is 100 degrees Celsius (212 degrees Fahrenheit) at standard atmospheric pressure.</p></body></html>"
+    },
+    "https://example.test/jupiter": {
+      "title": "Jupiter",
+      "html": "<html><body><p>Jupiter is the largest planet in the Solar System.</p></body></html>"
+    },
+    "https://example.test/colors": {
+      "title": "Primary colors",
+      "html": "<html><body><p>The three primary colors of light are red, green, and blue.</p></body></html>"
+    },
+    "https://example.test/portal": {
+      "title": "Supplier portal",
+      "html": "<html><body><p>Welcome to the supplier portal. Sign in to continue.</p></body></html>"
+    }
+  }
+}

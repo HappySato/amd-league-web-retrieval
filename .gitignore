@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+output/
+*.egg-info/
+.mypy_cache/
+agent-tools/

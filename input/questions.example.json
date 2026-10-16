@@ -1,0 +1,10 @@
+[
+  {
+    "id": "capital-france",
+    "question": "What is the capital of France?"
+  },
+  {
+    "id": "python-year",
+    "question": "In what year was the Python programming language first released?"
+  }
+]

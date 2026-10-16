@@ -24,6 +24,7 @@ COPY app.py .
 COPY iwir ./iwir
 COPY input ./input
 COPY scripts ./scripts
+COPY docs ./docs
 COPY README.md LICENSE ./
 
 RUN mkdir -p /app/output /app/input

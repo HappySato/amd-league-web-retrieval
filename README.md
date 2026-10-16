@@ -32,7 +32,7 @@ A question runs like this:
 2. Providers run in order and stop at the first one that returns hits. The rest stay queued. If the answer is still weak, the next provider is tried, up to four more rounds. A snippet-only answer gets one extra source, then the pipeline stops, so a rate limit does not spend the whole 24 seconds.
 3. Wikipedia article URLs are read through the MediaWiki parse API (lead section and infobox). Other URLs are fetched directly, with an 800 KB cap. Private, loopback, and link-local addresses, including the cloud metadata host, are refused.
 4. The heuristic keeps a value only when that value occurs in the page. It will not echo the question ("France" for "capital of France") or return a name for a "how many" question.
-5. If `LLM_BASE_URL` and `LLM_MODEL` are both set and the heuristic is below 0.88 confidence, the best passages go to `/v1/chat/completions`. The model's value is kept only when it appears in the cited page.
+5. When `LLM_BASE_URL` and `LLM_MODEL` are both set and `GET /v1/models` succeeds, the model rewrites the question into one to three search queries, then extracts one value from the fetched pages. It must return JSON. The value is kept only when that string appears in the cited page. A strong rule hit (about 0.9) still wins if the two disagree. If the server is unset, unreachable, slow, or not valid JSON, the rule extractor is used and a JSON file is still written.
 6. The file is written by a temp file and rename.
 
 The model is not loaded inside `app.py`. Weight loading does not fit in 24 seconds. Keep vLLM resident and send questions to it.
@@ -179,7 +179,11 @@ The harness can also run `python3 /app/app.py --query-id demo --query "What is t
 
 ## AMD vLLM
 
-Use a free notebook from [notebooks.amd.com/hackathon](https://notebooks.amd.com/hackathon). The app container stays on CPU; the model stays in its own process.
+Use a free notebook from [notebooks.amd.com/hackathon](https://notebooks.amd.com/hackathon). The step-by-step, including the one-command evidence run, is [docs/AMD_NOTEBOOK.md](docs/AMD_NOTEBOOK.md). The app container stays on CPU; the model stays in its own process.
+
+```bash
+python scripts/amd_vllm_notebook.py --evidence
+```
 
 ```bash
 python scripts/amd_vllm_notebook.py --check
@@ -202,7 +206,7 @@ python3 app.py --query-id demo --query "What is the capital of France?"
 
 Install vLLM from the ROCm build that matches the notebook image. The script does not `pip install` a CUDA wheel. Upstream notes: [vLLM GPU install](https://docs.vllm.ai/en/stable/getting_started/installation/gpu/). If you would rather serve the model in Docker, a current ROCm image is `vllm/vllm-openai-rocm`. The app container only needs HTTP access to it.
 
-The heuristic answers the bundled sample without a GPU. Turn the model on when the pattern matcher abstains or returns a low confidence. A fluent guess that is not in the cited page is discarded.
+The heuristic answers the bundled sample without a GPU. When the local server is reachable, each question is also rewritten into search queries and the fetched pages are read by the model. The rule extractor still runs, and it wins when it is more confident. A value that does not appear in the cited page is discarded. The process always writes JSON.
 
 ## Evaluation
 
@@ -216,6 +220,8 @@ python eval/evaluate.py --mode live --limit 3 --timeout 24
 | --- | --- | --- |
 | `fixture` | `eval/questions.json` (11), replayed from `eval/fixtures/bundle.json` | no |
 | `live` | `eval/questions_live.json` (25), unless `--questions` is set | yes, keyless providers only |
+
+Fixture mode ignores `LLM_BASE_URL` and `LLM_MODEL`, so a shell that already exported them still scores the offline bundle. Live mode passes those variables through. Unset them for a rule-only live run.
 
 `match` on each question picks the primary score. **Exact** compares the normalized value (case and punctuation ignored; `8` and `eight` match). **Contains** also accepts the gold value inside a longer answer, and the other way around. An empty gold answer is correct only when the prediction is empty.
 

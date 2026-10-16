@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -101,6 +102,14 @@ def main(argv: list[str] | None = None) -> int:
 
 def _config(mode: str, output: Path, timeout: float) -> Config:
     fixture = mode == "fixture"
+    # Fixture replay must not call a model. Live mode uses a local vLLM only
+    # when both variables are set; an empty value keeps the rule extractor.
+    if fixture:
+        llm_base, llm_model, llm_key = "", "", ""
+    else:
+        llm_base = os.environ.get("LLM_BASE_URL", "").strip()
+        llm_model = os.environ.get("LLM_MODEL", "").strip()
+        llm_key = os.environ.get("LLM_API_KEY", "")
     return Config(
         input_path=None,
         input_json="",
@@ -121,9 +130,9 @@ def _config(mode: str, output: Path, timeout: float) -> Config:
         output_fields=None,
         filename_template=None,
         include_diagnostics=False,
-        llm_base_url="",
-        llm_model="",
-        llm_api_key="",
+        llm_base_url=llm_base,
+        llm_model=llm_model,
+        llm_api_key=llm_key,
         llm_json_mode=True,
         log_level="WARNING",
     )

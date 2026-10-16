@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+from eval.evaluate import _config
 from eval.evaluate import main as evaluate_main
 from eval.evaluate import percentile, summarize
 from eval.scoring import score_answer
@@ -23,6 +26,20 @@ def test_fixture_evaluation_passes(tmp_path) -> None:
     assert code == 0
     report = (tmp_path / "report.json").read_text(encoding="utf-8")
     assert '"primary_pass": 11' in report
+
+
+def test_fixture_mode_ignores_llm_env(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:9/v1")
+    monkeypatch.setenv("LLM_MODEL", "should-not-be-called")
+    monkeypatch.setenv("LLM_API_KEY", "sk-test")
+    fixture = _config("fixture", Path("/tmp/iwir-eval-unused"), 8)
+    assert fixture.llm_base_url == ""
+    assert fixture.llm_model == ""
+    assert fixture.llm_api_key == ""
+    live = _config("live", Path("/tmp/iwir-eval-unused"), 8)
+    assert live.llm_base_url == "http://127.0.0.1:9/v1"
+    assert live.llm_model == "should-not-be-called"
+    assert live.llm_api_key == "sk-test"
 
 
 def test_latency_percentiles_and_abstain_rate() -> None:

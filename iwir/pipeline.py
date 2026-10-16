@@ -133,35 +133,74 @@ def _search(
 ) -> list[SearchHit]:
     if time.monotonic() >= deadline - 0.2:
         return []
-    primary = search_query(question.question)
+    queries = _search_queries(question, services, deadline)
+    hits: list[SearchHit] = []
+    used = queries[0] if queries else search_query(question.question)
+    for query in queries:
+        if time.monotonic() >= deadline - 0.2:
+            break
+        found = _run_search(services, question, config, deadline, query)
+        used = query
+        hits = [hit for hit in found if allowed_url(hit.url)]
+        if hits:
+            break
+    if not hits and time.monotonic() < deadline - 0.2:
+        keywords = keyword_query(question.question)
+        tried = {query.casefold() for query in queries}
+        if keywords and keywords.casefold() not in tried and keywords.casefold() != question.question.casefold():
+            found = _run_search(services, question, config, deadline, keywords)
+            hits = [hit for hit in found if allowed_url(hit.url)]
+            if hits:
+                used = keywords
+    services.active_query = used
+    return hits
+
+
+def _search_queries(question: Question, services: Services, deadline: float) -> list[str]:
+    """Model queries first, then the rule-based query. Duplicates are dropped."""
+    fallback = search_query(question.question)
+    rewritten: list[str] = []
+    llm = services.llm
+    rewrite = getattr(llm, "rewrite_queries", None) if llm is not None and getattr(llm, "enabled", False) else None
+    if rewrite is not None:
+        try:
+            rewritten = list(rewrite(question.question, deadline) or [])
+        except Exception as exc:
+            log.warning("query rewrite failed; using the rule-based query: %s", exc)
+            rewritten = []
+    queries: list[str] = []
+    seen: set[str] = set()
+    for query in [*rewritten, fallback]:
+        text = " ".join(str(query).split()).strip()
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        queries.append(text)
+    return queries[:3]
+
+
+def _run_search(
+    services: Services,
+    question: Question,
+    config: Config,
+    deadline: float,
+    query: str,
+) -> list[SearchHit]:
     request = SearchRequest(
-        query=primary,
+        query=query,
         question=question.question,
         question_id=question.id,
         limit=config.search_limit,
         deadline=deadline,
     )
     try:
-        hits = list(services.search(request) or [])
+        return list(services.search(request) or [])
     except Exception as exc:
         log.warning("search failed: %s", exc)
-        hits = []
-    if not hits and time.monotonic() < deadline - 0.2:
-        keywords = keyword_query(question.question)
-        if keywords and keywords.casefold() not in {question.question.casefold(), primary.casefold()}:
-            retry = SearchRequest(
-                query=keywords,
-                question=question.question,
-                question_id=question.id,
-                limit=config.search_limit,
-                deadline=deadline,
-            )
-            try:
-                hits = list(services.search(retry) or [])
-            except Exception as exc:
-                log.warning("keyword search failed: %s", exc)
-                hits = []
-    return [hit for hit in hits if allowed_url(hit.url)]
+        return []
 
 
 def _search_rest(
@@ -174,7 +213,7 @@ def _search_rest(
     if rest is None or time.monotonic() >= deadline - 0.4:
         return []
     request = SearchRequest(
-        query=search_query(question.question),
+        query=getattr(services, "active_query", None) or search_query(question.question),
         question=question.question,
         question_id=question.id,
         limit=config.search_limit,
@@ -265,9 +304,7 @@ def _from_llm(
     heuristic: Candidate | None,
 ) -> Candidate | None:
     llm = services.llm
-    if llm is None or not llm.enabled or not pages:
-        return None
-    if heuristic is not None and heuristic.confidence >= 0.88:
+    if llm is None or not getattr(llm, "enabled", False) or not pages:
         return None
     if time.monotonic() > deadline - 1.2:
         return None
@@ -300,7 +337,9 @@ def _candidate_from_llm(question: str, extracted: LLMAnswer, pages: list[Page]) 
     if not answer or not supported(answer, page.text):
         log.info("dropping LLM answer %r; it is not in %s", extracted.answer, page.url)
         return None
-    confidence = max(0.8, min(0.95, extracted.confidence if extracted.confidence else 0.8))
+    # Cap below a strong infobox hit so a merely-present span cannot replace it.
+    # Agreement still raises confidence when the two answers match.
+    confidence = max(0.8, min(0.9, extracted.confidence if extracted.confidence else 0.8))
     if not quote:
         confidence -= 0.05
     return Candidate(
